@@ -51,9 +51,9 @@ The binary is then available at `target/release/gentooplz`.
 ## Usage
 
 ```sh
-sudo ./target/release/whatamicompiling
+sudo ./target/release/gentooplz
 # or, on systems using doas:
-doas ./target/release/whatamicompiling
+doas ./target/release/gentooplz
 ```
 
 ### CLI flags
