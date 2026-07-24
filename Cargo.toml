@@ -2,8 +2,13 @@
 name = "gentooplz"
 version = "0.1.0"
 edition = "2021"
-description = "Are we there yet?"
+authors = ["JustRoccat"]
+description = "Gentoo please... A terminal build monitor for Portage."
 license = "MIT"
+repository = "https://github.com/JustRoccat/gentooplz"
+readme = "README.md"
+keywords = ["gentoo", "portage", "tui", "cli"]
+categories = ["command-line-utilities"]
 
 [[bin]]
 name = "gentooplz"
@@ -23,3 +28,5 @@ libc = "0.2"
 [profile.release]
 opt-level = 3
 lto = true
+codegen-units = 1
+panic = "abort"
