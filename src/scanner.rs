@@ -1,6 +1,8 @@
 use crate::model::{BuildSystem, PackageState, ScanEvent, SystemCompileState};
 use crate::parser::{parse_build_log, parse_emerge_job_progress};
 use anyhow::Result;
+use once_cell::sync::Lazy;
+use regex::Regex;
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -16,14 +18,20 @@ struct RawCandidate {
     build_dir: PathBuf,
 }
 
+static PKG_VERSION_RE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(
+        r"^(?P<name>.+)-(?P<version>[0-9]+(?:\.[0-9]+)*[a-z]?(?:_(?:alpha|beta|pre|rc|p)[0-9]*)*(?:-r[0-9]+)?)$",
+    )
+    .unwrap()
+});
+
 fn split_name_version(dirname: &str) -> (String, String) {
-    if let Some(idx) = dirname.rfind('-') {
-        let (name, ver) = dirname.split_at(idx);
-        let ver = &ver[1..]; // skip the dash
-        if ver.chars().next().is_some_and(|c| c.is_ascii_digit()) {
-            return (name.to_string(), ver.to_string());
-        }
+    if let Some(caps) = PKG_VERSION_RE.captures(dirname) {
+        let name = caps["name"].to_string();
+        let version = caps["version"].to_string();
+        return (name, version);
     }
+
     (dirname.to_string(), String::new())
 }
 
@@ -147,8 +155,15 @@ fn count_files_with_ext(dir: &Path, exts: &[&str], cap: usize) -> usize {
             if visited > cap {
                 return count;
             }
+
+            let Ok(file_type) = entry.file_type() else {
+                continue;
+            };
+            if file_type.is_symlink() {
+                continue;
+            }
             let path = entry.path();
-            if path.is_dir() {
+            if file_type.is_dir() {
                 stack.push(path);
             } else if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
                 if exts.iter().any(|e| e.eq_ignore_ascii_case(ext)) {
@@ -160,12 +175,62 @@ fn count_files_with_ext(dir: &Path, exts: &[&str], cap: usize) -> usize {
     count
 }
 
-fn detect_build_system_hint(build_dir: &Path) -> BuildSystem {
-    if build_dir.join("temp").join("build.log").exists() {
-        BuildSystem::Unknown
-    } else {
-        BuildSystem::Unknown
+const BUILD_SYSTEM_MARKERS: &[(&str, BuildSystem)] = &[
+    ("Cargo.toml", BuildSystem::Cargo),
+    ("build.ninja", BuildSystem::Ninja),
+    ("Makefile", BuildSystem::Make),
+    ("GNUmakefile", BuildSystem::Make),
+];
+
+fn find_build_system_marker(dir: &Path, cap: usize) -> Option<BuildSystem> {
+    let mut visited = 0usize;
+    let mut stack = vec![dir.to_path_buf()];
+
+    while let Some(d) = stack.pop() {
+        let Ok(entries) = fs::read_dir(&d) else {
+            continue;
+        };
+
+        for entry in entries.flatten() {
+            visited += 1;
+            if visited > cap {
+                return None;
+            }
+
+            let Ok(file_type) = entry.file_type() else {
+                continue;
+            };
+            if file_type.is_symlink() {
+                continue;
+            }
+
+            let path = entry.path();
+            let Some(file_name) = path.file_name().and_then(|n| n.to_str()) else {
+                continue;
+            };
+
+            if file_type.is_dir() {
+                if file_name == "temp" {
+                    continue;
+                }
+                stack.push(path);
+                continue;
+            }
+
+            if let Some((_, system)) = BUILD_SYSTEM_MARKERS
+                .iter()
+                .find(|(marker, _)| *marker == file_name)
+            {
+                return Some(*system);
+            }
+        }
     }
+
+    None
+}
+
+fn detect_build_system_hint(build_dir: &Path) -> BuildSystem {
+    find_build_system_marker(build_dir, FS_SCAN_CAP).unwrap_or(BuildSystem::Unknown)
 }
 
 fn scan_once(

@@ -86,7 +86,7 @@ Portage scanner (scanner.rs)  --ScanEvent (mpsc)-->  App (main.rs)  -->  ratatui
 Each tick, the scanner:
 
 1. Walks `/var/tmp/portage` for package directories with a `temp/` subfolder the marker that emerge is actively working on them.
-2. Reads the tail of each build's `build.log` to detect the build system and progress.
+2. Reads the tail of each build's `build.log` to detect the build system and progress. If the log hasn't printed anything recognizable yet (e.g. very early in the build, or a build system that stays quiet), it falls back to scanning the build directory itself for marker files (`Cargo.toml`, `build.ninja`, `Makefile`) to still label the build system correctly.
 3. Matches running processes (via `sysinfo`) whose working directory or command line points inside the build directory, then sums CPU/RAM across their whole process trees.
 4. Reads the tail of `/var/log/emerge.log` to resolve the current position in the merge queue.
 

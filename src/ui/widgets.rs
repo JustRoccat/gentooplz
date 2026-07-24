@@ -112,13 +112,18 @@ fn pill(text: String, color: Color) -> Span<'static> {
 }
 
 pub fn render_header(frame: &mut Frame, area: Rect, view: View) {
+    const LOGO_TEXT: &str = " gentooplz ";
+
     let cols = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([Constraint::Length(10), Constraint::Min(10)])
+        .constraints([
+            Constraint::Length(LOGO_TEXT.len() as u16),
+            Constraint::Min(10),
+        ])
         .split(area);
 
     let logo = Line::from(vec![Span::styled(
-        " gentooplz ",
+        LOGO_TEXT,
         Style::default()
             .fg(INK)
             .bg(ACCENT)
