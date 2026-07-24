@@ -118,7 +118,7 @@ pub fn render_header(frame: &mut Frame, area: Rect, view: View) {
         .split(area);
 
     let logo = Line::from(vec![Span::styled(
-        " gentoplz ",
+        " gentooplz ",
         Style::default()
             .fg(INK)
             .bg(ACCENT)
