@@ -5,19 +5,22 @@ mod ui;
 
 use anyhow::Result;
 use clap::Parser;
-use crossterm::event::{self, Event, KeyCode, KeyEventKind};
+use crossterm::event::{Event, EventStream, KeyCode, KeyEventKind};
 use crossterm::execute;
 use crossterm::terminal::{
-    disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
+    EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode,
 };
+use futures_util::StreamExt;
 use model::{ScanEvent, SystemCompileState};
-use ratatui::backend::CrosstermBackend;
 use ratatui::Terminal;
+use ratatui::backend::CrosstermBackend;
+use ratatui::widgets::TableState;
 use std::collections::VecDeque;
 use std::io::stdout;
 use std::path::PathBuf;
 use std::time::Duration;
 use tokio::sync::mpsc;
+use tokio::time::MissedTickBehavior;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -69,6 +72,7 @@ struct App {
     selected: usize,
     cpu_history: VecDeque<f32>,
     view: View,
+    sidebar_table_state: TableState,
 }
 
 impl App {
@@ -79,6 +83,7 @@ impl App {
             selected: 0,
             cpu_history: VecDeque::with_capacity(HISTORY_LEN),
             view: View::Building,
+            sidebar_table_state: TableState::default(),
         }
     }
 
@@ -88,12 +93,23 @@ impl App {
             self.cpu_history.pop_front();
         }
 
-        let len = state.active_packages.len();
-        if len == 0 {
-            self.selected = 0;
-        } else if self.selected >= len {
-            self.selected = len - 1;
-        }
+        let previously_selected = self
+            .state
+            .active_packages
+            .get(self.selected)
+            .map(|p| p.build_dir.clone());
+
+        self.selected = previously_selected
+            .and_then(|dir| {
+                state
+                    .active_packages
+                    .iter()
+                    .position(|p| p.build_dir == dir)
+            })
+            .unwrap_or_else(|| {
+                self.selected
+                    .min(state.active_packages.len().saturating_sub(1))
+            });
 
         self.state = state;
     }
@@ -101,10 +117,8 @@ impl App {
     fn handle_key(&mut self, code: KeyCode) {
         match code {
             KeyCode::Char('q') | KeyCode::Esc => self.should_quit = true,
-            KeyCode::Up | KeyCode::Char('k') => {
-                if self.selected > 0 {
-                    self.selected -= 1;
-                }
+            KeyCode::Up | KeyCode::Char('k') if self.selected > 0 => {
+                self.selected -= 1;
             }
             KeyCode::Down | KeyCode::Char('j') => {
                 let len = self.state.active_packages.len();
@@ -124,7 +138,7 @@ impl App {
 }
 
 fn running_as_root() -> bool {
-    unsafe { libc::geteuid() == 0 }
+    rustix::process::geteuid().is_root()
 }
 
 fn is_on_path(bin: &str) -> bool {
@@ -272,24 +286,38 @@ async fn run_app(
     app: &mut App,
     rx: &mut mpsc::Receiver<ScanEvent>,
 ) -> Result<()> {
+    let mut term_events = EventStream::new();
+    let mut redraw = tokio::time::interval(Duration::from_millis(100));
+    redraw.set_missed_tick_behavior(MissedTickBehavior::Delay);
+
     loop {
-        while let Ok(event) = rx.try_recv() {
-            match event {
-                ScanEvent::Update(state) => app.apply_update(state),
-                ScanEvent::Error(_msg) => {}
+        tokio::select! {
+            Some(event) = rx.recv() => {
+                match event {
+                    ScanEvent::Update(state) => app.apply_update(state),
+                    ScanEvent::Error(_msg) => {}
+                }
             }
-        }
-
-        terminal
-            .draw(|frame| ui::draw(frame, &app.state, app.selected, &app.cpu_history, app.view))?;
-
-        if event::poll(Duration::from_millis(100))? {
-            if let Event::Key(key) = event::read()? {
-                if key.kind == KeyEventKind::Press {
+            Some(Ok(event)) = term_events.next() => {
+                if let Event::Key(key) = event
+                    && key.kind == KeyEventKind::Press
+                {
                     app.handle_key(key.code);
                 }
             }
+            _ = redraw.tick() => {}
         }
+
+        terminal.draw(|frame| {
+            ui::draw(
+                frame,
+                &app.state,
+                app.selected,
+                &app.cpu_history,
+                app.view,
+                &mut app.sidebar_table_state,
+            )
+        })?;
 
         if app.should_quit {
             break;

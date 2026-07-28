@@ -1,7 +1,7 @@
 [package]
 name = "gentooplz"
 version = "0.2.0"
-edition = "2021"
+edition = "2024"
 authors = ["JustRoccat"]
 description = "Gentoo please... A terminal build monitor for Portage."
 license = "MIT"
@@ -15,15 +15,15 @@ name = "gentooplz"
 path = "src/main.rs"
 
 [dependencies]
-ratatui = "0.28"
-crossterm = "0.28"
-sysinfo = "0.32"
+ratatui = "0.30"
+crossterm = { version = "0.29", features = ["event-stream"] }
+sysinfo = "0.39"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync", "fs"] }
 clap = { version = "4", features = ["derive"] }
 regex = "1"
-once_cell = "1"
 anyhow = "1"
-libc = "0.2"
+rustix = { version = "1", features = ["process"] }
+futures-util = "0.3"
 
 [profile.release]
 opt-level = 3

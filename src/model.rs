@@ -1,11 +1,12 @@
 use std::path::PathBuf;
 use std::time::Instant;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum BuildSystem {
     Ninja,
     Make,
     Cargo,
+    #[default]
     Unknown,
 }
 
@@ -45,12 +46,6 @@ pub struct SystemCompileState {
     pub system_mem_used_mb: u64,
     pub system_mem_total_mb: u64,
     pub load_avg_1: f64,
-}
-
-impl Default for BuildSystem {
-    fn default() -> Self {
-        BuildSystem::Unknown
-    }
 }
 
 #[derive(Debug, Clone)]

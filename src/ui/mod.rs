@@ -3,6 +3,7 @@ mod widgets;
 use crate::model::SystemCompileState;
 use crate::View;
 use ratatui::layout::{Constraint, Direction, Layout};
+use ratatui::widgets::TableState;
 use ratatui::Frame;
 use std::collections::VecDeque;
 
@@ -12,6 +13,7 @@ pub fn draw(
     selected: usize,
     cpu_history: &VecDeque<f32>,
     view: View,
+    sidebar_table_state: &mut TableState,
 ) {
     let outer = Layout::default()
         .direction(Direction::Vertical)
@@ -31,7 +33,7 @@ pub fn draw(
         .constraints([Constraint::Length(38), Constraint::Min(28)])
         .split(outer[2]);
 
-    widgets::render_sidebar(frame, body[0], state, selected);
+    widgets::render_sidebar(frame, body[0], state, selected, sidebar_table_state);
 
     match view {
         View::Building => {

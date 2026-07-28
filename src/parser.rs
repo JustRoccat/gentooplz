@@ -1,22 +1,24 @@
 use crate::model::BuildSystem;
-use once_cell::sync::Lazy;
 use regex::Regex;
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
+use std::sync::LazyLock;
 
 const TAIL_BYTES: i64 = 4096;
 
-static NINJA_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\[\s*(\d+)/(\d+)\]\s*(.*)").unwrap());
+static NINJA_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\[\s*(\d+)/(\d+)\]\s*(.*)").unwrap());
 
-static MAKE_PCT_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\[\s*(\d{1,3})%\]\s*(.*)").unwrap());
+static MAKE_PCT_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\[\s*(\d{1,3})%\]\s*(.*)").unwrap());
 
-static CARGO_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^\s*Compiling\s+(\S+)\s+v?(\S*)").unwrap());
-static CARGO_COUNT_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\((\d+)/(\d+)\)").unwrap());
+static CARGO_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^\s*Compiling\s+(\S+)\s+v?(\S*)").unwrap());
+static CARGO_COUNT_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\((\d+)/(\d+)\)").unwrap());
 
-static EMERGE_JOB_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r">>>\s*emerge\s*\((\d+)\s+of\s+(\d+)\)").unwrap());
+static EMERGE_JOB_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r">>>\s*emerge\s*\((\d+)\s+of\s+(\d+)\)").unwrap());
 
 const EMERGE_LOG_TAIL_BYTES: i64 = 16_384;
 
