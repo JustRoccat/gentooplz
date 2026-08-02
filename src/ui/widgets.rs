@@ -257,14 +257,14 @@ pub fn render_sidebar(
         stat_rows[3],
         "cpu",
         state.system_cpu_pct,
-        format!("{:.0}%", state.system_cpu_pct),
+        format!("{:>2.0}%", state.system_cpu_pct.min(99.9)),
     );
     render_sidebar_gauge(
         frame,
         stat_rows[4],
         "ram",
         mem_pct,
-        format!("{mem_pct:.0}%"),
+        format!("{:>2.0}%", mem_pct.min(99.0)),
     );
     frame.render_widget(
         Paragraph::new(sidebar_stat("load", format!("{:.2}", state.load_avg_1))),
